@@ -1,28 +1,27 @@
+import os
+import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import os
-import requests
-from dotenv import load_dotenv
 
 # Carica le variabili dal file .env
 load_dotenv()
 
 app = FastAPI()
 
-# Recupera la chiave dalle variabili di sistema
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 BASE_URL = "https://api.themoviedb.org/3"
 
-# --- MODELLI PER IL FRONTEND ---
+# --- MODELLI PYDANTIC (Indispensabili per il frontend) ---
 
 
 class MovieCard(BaseModel):
     id: int
     title: str
     poster_path: Optional[str] = None
-    release_date: Optional[str] = ""  # Default stringa vuota se manca
+    release_date: Optional[str] = ""
     vote_average: float
 
 
@@ -46,57 +45,45 @@ class MovieDetail(BaseModel):
     trailer_key: Optional[str] = None
     cast: List[Actor]
 
-# --- LOGICA DI SUPPORTO ---
-
-
-def call_tmdb(endpoint: str, params: dict = {}):
-    p = {"api_key": TMDB_API_KEY, "language": "it-IT"}
-    p.update(params)
-    response = requests.get(f"{BASE_URL}{endpoint}", params=p)
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=response.status_code, detail="Errore TMDB")
-    return response.json()
-
-# --- ROTTE API FILTRATE ---
+# --- ROTTE API ---
 
 
 @app.get("/api/trending", response_model=List[MovieCard])
 def get_trending():
-    data = call_tmdb("/trending/movie/week")
-    # Pulizia preventiva per evitare errori di validazione Pydantic
-    results = []
-    for m in data.get("results", []):
-        results.append({
-            "id": m.get("id"),
-            "title": m.get("title"),
-            "poster_path": m.get("poster_path"),
-            "release_date": m.get("release_date") or "",  # Gestisce null
-            "vote_average": m.get("vote_average", 0)
-        })
-    return results
+    # URL nel formato richiesto
+    url = f"{BASE_URL}/trending/movie/week?api_key={TMDB_API_KEY}&language=it-IT"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Errore TMDB")
+
+    data = response.json()
+    return data["results"]
 
 
 @app.get("/api/search", response_model=List[MovieCard])
 def search_movie(query: str):
-    data = call_tmdb("/search/movie", {"query": query})
-    results = []
-    for m in data.get("results", []):
-        results.append({
-            "id": m.get("id"),
-            "title": m.get("title"),
-            "poster_path": m.get("poster_path"),
-            "release_date": m.get("release_date") or "",
-            "vote_average": m.get("vote_average", 0)
-        })
-    return results
+    # URL nel formato richiesto (aggiungendo il parametro query)
+    url = f"{BASE_URL}/search/movie?api_key={TMDB_API_KEY}&language=it-IT&query={query}"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Errore TMDB")
+
+    data = response.json()
+    return data["results"]
 
 
 @app.get("/api/movie/{movie_id}", response_model=MovieDetail)
 def get_movie_details(movie_id: int):
-    data = call_tmdb(f"/movie/{movie_id}",
-                     {"append_to_response": "credits,videos"})
+    # URL nel formato richiesto con append_to_response per cast e video
+    url = f"{BASE_URL}/movie/{movie_id}?api_key={TMDB_API_KEY}&language=it-IT&append_to_response=credits,videos"
+    response = requests.get(url)
 
+    if response.status_code != 200:
+        raise HTTPException(status_code=404, detail="Film non trovato")
+
+    data = response.json()
+
+    # Estrazione dati semplificata per il frontend
     director = next((c["name"] for c in data["credits"]
                     ["crew"] if c["job"] == "Director"), "N/D")
     trailer = next((v["key"] for v in data["videos"]["results"]
@@ -117,26 +104,23 @@ def get_movie_details(movie_id: int):
         "cast": data["credits"]["cast"][:6]
     }
 
-# --- ROTTE FRONTEND ---
+# --- ROTTE FRONTEND (Con protezione URL manipolate) ---
 
 
 @app.get("/")
-async def serve_index(): return FileResponse('index.html')
+async def serve_index():
+    return FileResponse('index.html')
 
 
 @app.get("/movie")
-async def serve_detail(id: str = None):
-    # 1. Se l'ID manca o non è un numero, reindirizziamo ISTANTANEAMENTE alla home
+async def serve_detail(id: Optional[str] = None):
+    # Se l'ID è manipolato (es: ?id=abc), il server reindirizza subito alla home
     if not id or not id.isdigit():
-        return RedirectResponse(url="/", status_code=307)
+        return RedirectResponse(url="/")
 
-    # 2. Verifichiamo se il film esiste davvero su TMDB prima di servire l'HTML
-    try:
-        # Usiamo una chiamata rapida solo per testare l'esistenza
-        call_tmdb(f"/movie/{id}")
-    except HTTPException:
-        # Se TMDB dà errore (es. 404), reindirizziamo alla home
-        return RedirectResponse(url="/", status_code=307)
+    # Verifica rapida se l'ID esiste su TMDB
+    check_url = f"{BASE_URL}/movie/{id}?api_key={TMDB_API_KEY}"
+    if requests.get(check_url).status_code != 200:
+        return RedirectResponse(url="/")
 
-    # 3. Solo se tutto è corretto, serviamo il file HTML
     return FileResponse('detail.html')
