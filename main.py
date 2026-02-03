@@ -2,11 +2,17 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional
+import os
 import requests
+from dotenv import load_dotenv
+
+# Carica le variabili dal file .env
+load_dotenv()
 
 app = FastAPI()
 
-TMDB_API_KEY = "daf81eb6bb254ac0fbc1698f53b401bf"
+# Recupera la chiave dalle variabili di sistema
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 BASE_URL = "https://api.themoviedb.org/3"
 
 # --- MODELLI PER IL FRONTEND ---
