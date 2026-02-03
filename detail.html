@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dettaglio Film</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-[#032541] text-white font-sans overflow-x-hidden">
+
+    <div id="toast"
+        class="fixed top-5 right-5 z-50 transform translate-x-[150%] transition-transform duration-500 ease-in-out">
+        <div
+            class="bg-red-600 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 border border-red-400">
+            <span class="text-xl">⚠️</span>
+            <span id="toastMessage" class="font-medium"></span>
+        </div>
+    </div>
+
+    <nav class="p-6 bg-[#031d33] flex justify-between items-center shadow-md relative z-10">
+        <h1 class="text-2xl font-bold text-[#01b4e4] cursor-pointer" onclick="location.href='/'">MOVIEDB</h1>
+        <a href="/" class="text-sm text-gray-400 hover:text-white">← Torna alla Home</a>
+    </nav>
+
+    <div id="mainContent" class="opacity-0 transition-opacity duration-700 ease-in-out">
+
+        <div id="heroBg" class="relative w-full py-16 px-10 bg-cover bg-center"
+            style="background-blend-mode: multiply; background-color: rgba(3, 37, 65, 0.85);">
+
+            <div class="max-w-6xl mx-auto flex flex-col md:flex-row gap-12 items-center md:items-start">
+
+                <div id="posterContainer"
+                    class="w-80 flex-shrink-0 shadow-2xl rounded-lg overflow-hidden border border-gray-800 bg-gray-700 min-h-[480px] flex items-center justify-center">
+                </div>
+
+                <div class="flex-1 text-center md:text-left">
+                    <h1 id="title" class="text-4xl font-bold mb-2"></h1>
+                    <div
+                        class="flex flex-wrap justify-center md:justify-start items-center gap-3 text-sm text-gray-300 mb-8">
+                        <span id="releaseDate" class="border px-2 py-0.5 rounded"></span>
+                        <span id="genres" class="font-medium"></span>
+                        <span id="runtime" class="before:content-['•'] before:mr-2"></span>
+                    </div>
+
+                    <div class="flex justify-center md:justify-start items-center gap-8 mb-10">
+                        <div class="flex items-center gap-3">
+                            <div id="ratingCircle"
+                                class="w-16 h-16 bg-[#081c22] border-4 rounded-full flex items-center justify-center text-xl font-bold">
+                            </div>
+                            <span class="font-bold text-xs text-left">Punteggio<br>Utente</span>
+                        </div>
+                        <a id="trailerBtn" target="_blank"
+                            class="flex items-center gap-2 font-bold hover:text-[#1ed5a9] transition hidden">
+                            <span class="bg-orange-500 p-2 rounded text-xs text-white">▶</span> Riproduci Trailer
+                        </a>
+                    </div>
+
+                    <div class="mb-8 text-left">
+                        <h3 class="text-xl font-semibold mb-3">Sinossi</h3>
+                        <p id="overview" class="text-gray-200 leading-relaxed text-lg max-w-3xl"></p>
+                    </div>
+
+                    <div class="text-left">
+                        <h4 id="directorName" class="font-bold text-xl text-[#01b4e4]"></h4>
+                        <p class="text-sm text-gray-400 font-medium">Regista</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <main class="max-w-6xl mx-auto p-12">
+            <h3 class="text-2xl font-bold mb-8 border-l-4 border-[#01b4e4] pl-4 text-left">Cast Principale</h3>
+            <div id="castGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-6"></div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = "/api";
+        const movieId = new URLSearchParams(window.location.search).get('id');
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').innerText = message;
+            toast.classList.remove('translate-x-[150%]');
+            setTimeout(() => toast.classList.add('translate-x-[150%]'), 5000);
+        }
+
+        window.onload = async () => {
+            const mainContent = document.getElementById('mainContent');
+
+            // 1. Validazione ID: Se non è un numero, blocca subito
+            if (!movieId || isNaN(movieId)) {
+                showToast("ID film non valido. Ritorno alla home...");
+                setTimeout(() => window.location.href = '/', 2500);
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/movie/${movieId}`);
+                if (!res.ok) throw new Error("Film non trovato");
+
+                const movie = await res.json();
+
+                // 2. Popola i dati nella pagina
+                render(movie);
+
+                // 3. Mostra la pagina con effetto fade-in
+                mainContent.classList.remove('opacity-0');
+                mainContent.classList.add('opacity-100');
+
+            } catch (e) {
+                showToast("Errore: il film richiesto non è disponibile.");
+                setTimeout(() => window.location.href = '/', 3000);
+            }
+        };
+
+        function render(movie) {
+            const pc = document.getElementById('posterContainer');
+            pc.innerHTML = movie.poster_path
+                ? `<img src="https://image.tmdb.org/t/p/w500${movie.poster_path}" class="w-full">`
+                : `<span class="text-2xl font-bold text-gray-500 uppercase">N/D</span>`;
+
+            if (movie.backdrop_path) {
+                document.getElementById('heroBg').style.backgroundImage = `url('https://image.tmdb.org/t/p/original${movie.backdrop_path}')`;
+            }
+
+            const releaseYear = movie.release_date ? movie.release_date.split('-')[0] : 'N/D';
+            document.getElementById('title').innerText = `${movie.title} (${releaseYear})`;
+            document.getElementById('releaseDate').innerText = movie.release_date || "Data N/D";
+            document.getElementById('genres').innerText = movie.genres.join(', ');
+            document.getElementById('runtime').innerText = movie.runtime ? `${movie.runtime} min` : "N/D";
+            document.getElementById('overview').innerText = movie.overview || "Nessuna sinossi disponibile.";
+            document.getElementById('directorName').innerText = movie.director;
+
+            const rating = Math.round(movie.vote_average * 10);
+            const circle = document.getElementById('ratingCircle');
+            circle.innerText = `${rating}%`;
+            circle.classList.add(rating >= 70 ? 'border-green-500' : 'border-yellow-500');
+
+            if (movie.trailer_key) {
+                const btn = document.getElementById('trailerBtn');
+                btn.href = `https://www.youtube.com/watch?v=${movie.trailer_key}`;
+                btn.classList.remove('hidden');
+            }
+
+            const grid = document.getElementById('castGrid');
+            grid.innerHTML = "";
+            movie.cast.forEach(actor => {
+                const photo = actor.profile_path
+                    ? `<img src="https://image.tmdb.org/t/p/w185${actor.profile_path}" class="w-full h-48 object-cover">`
+                    : `<div class="w-full h-48 bg-gray-300 flex items-center justify-center text-gray-500 font-bold text-xl">N/D</div>`;
+
+                grid.innerHTML += `
+                    <div class="bg-white text-black rounded-lg overflow-hidden shadow-lg flex flex-col">
+                        ${photo}
+                        <div class="p-3 flex-grow flex flex-col justify-center text-left">
+                            <p class="font-bold text-[11px] leading-tight">${actor.name}</p>
+                            <p class="text-[9px] text-gray-500 uppercase mt-1 tracking-tighter">${actor.character}</p>
+                        </div>
+                    </div>`;
+            });
+        }
+    </script>
+</body>
+
+</html>

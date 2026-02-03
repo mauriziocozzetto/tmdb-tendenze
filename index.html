@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieDB - Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .movie-card:hover img {
+            transform: scale(1.05);
+        }
+
+        .transition-all {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+
+<body class="bg-[#032541] text-white font-sans overflow-x-hidden">
+
+    <div id="toast"
+        class="fixed top-5 right-5 z-50 transform translate-x-[150%] transition-transform duration-500 ease-in-out">
+        <div
+            class="bg-red-600 text-white px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 border border-red-400">
+            <span class="text-xl">⚠️</span>
+            <span id="toastMessage" class="font-medium"></span>
+        </div>
+    </div>
+
+    <nav class="p-6">
+        <h1 class="text-2xl font-bold text-[#01b4e4] cursor-pointer" onclick="location.href='/'">MOVIEDB</h1>
+    </nav>
+
+    <header class="px-10 py-16 bg-gradient-to-r from-[#032541] to-[#01b4e4]/20">
+        <h2 class="text-5xl font-bold mb-2">Benvenuto.</h2>
+        <p class="text-2xl mb-10 text-gray-200">Milioni di film e persone da scoprire. Esplora ora.</p>
+
+        <div class="relative flex items-center w-full max-w-5xl">
+            <input type="text" id="searchInput" placeholder="Cerca un film..."
+                class="w-full py-4 px-8 rounded-full text-gray-800 text-lg outline-none shadow-xl"
+                onkeypress="if(event.key === 'Enter') handleSearch()">
+            <button onclick="handleSearch()"
+                class="absolute right-0 bg-gradient-to-r from-[#1ed5a9] to-[#01b4e4] px-10 py-4 rounded-full font-bold text-white hover:text-black transition-all">
+                Cerca
+            </button>
+        </div>
+    </header>
+
+    <main class="p-10">
+        <h3 id="sectionTitle" class="text-2xl font-semibold mb-8 border-l-4 border-[#1ed5a9] pl-4">Tendenze</h3>
+        <div id="movieGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-10"></div>
+    </main>
+
+    <script>
+        const API_BASE = "/api";
+
+        window.onload = () => fetchMovies('/trending');
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').innerText = message;
+            toast.classList.remove('translate-x-[150%]');
+            setTimeout(() => toast.classList.add('translate-x-[150%]'), 5000);
+        }
+
+        async function fetchMovies(endpoint) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`);
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                renderMovies(data); // Il backend ora restituisce direttamente la lista
+            } catch (error) {
+                showToast("Errore nel caricamento dei film.");
+            }
+        }
+
+        async function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query === "") {
+                showToast("Per favore, inserisci il titolo di un film.");
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                if (data.length === 0) {
+                    showToast("Nessun risultato trovato.");
+                } else {
+                    document.getElementById('sectionTitle').innerText = `Risultati per: ${query}`;
+                    renderMovies(data);
+                }
+            } catch (error) { showToast("Errore durante la ricerca."); }
+        }
+
+        function renderMovies(movies) {
+            const grid = document.getElementById('movieGrid');
+            grid.innerHTML = "";
+            movies.forEach(movie => {
+                const year = movie.release_date ? movie.release_date.split('-')[0] : 'N/D';
+                const rating = Math.round(movie.vote_average * 10);
+                const circleColor = rating >= 70 ? 'border-green-500' : 'border-yellow-500';
+
+                const posterHtml = movie.poster_path
+                    ? `<img src="https://image.tmdb.org/t/p/w500${movie.poster_path}" class="w-full transition-transform duration-300 group-hover:scale-105">`
+                    : `<div class="w-full aspect-[2/3] bg-gray-700 flex flex-col items-center justify-center text-gray-400 p-4 text-center text-xs"><span>N/D</span><br><span>${movie.title}</span></div>`;
+
+                grid.innerHTML += `
+                    <div class="group cursor-pointer" onclick="window.location.href='/movie?id=${movie.id}'">
+                        <div class="relative overflow-hidden rounded-xl shadow-lg bg-gray-800">
+                            ${posterHtml}
+                            <div class="absolute -bottom-4 left-3 w-10 h-10 bg-[#081c22] border-2 ${circleColor} rounded-full flex items-center justify-center text-[10px] font-bold">
+                                ${rating}%
+                            </div>
+                        </div>
+                        <div class="mt-6 text-left">
+                            <h4 class="font-bold text-sm leading-tight group-hover:text-[#01b4e4] transition-all">${movie.title}</h4>
+                            <p class="text-gray-400 text-xs mt-1">${year}</p>
+                        </div>
+                    </div>`;
+            });
+        }
+    </script>
+</body>
+
+</html>
