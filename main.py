@@ -26,9 +26,56 @@ class MovieCard(BaseModel):
 
 
 class Actor(BaseModel):
+    id: int
     name: str
     character: str
     profile_path: Optional[str] = None
+
+# 1. Aggiungi il modello Pydantic per i dettagli dell'attore
+
+
+class ActorDetail(BaseModel):
+    id: int
+    name: str
+    biography: Optional[str] = None
+    birthday: Optional[str] = None
+    place_of_birth: Optional[str] = None
+    profile_path: Optional[str] = None
+
+# 2. Crea la rotta API per l'attore
+
+
+@app.get("/api/actor/{actor_id}", response_model=ActorDetail)
+def get_actor_details(actor_id: int):
+    url = f"{BASE_URL}/person/{actor_id}?api_key={TMDB_API_KEY}&language=it-IT"
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise HTTPException(status_code=404, detail="Attore non trovato")
+    return response.json()
+
+# 3. Crea la rotta per servire l'HTML (con protezione)
+
+@app.get("/actor")
+async def serve_actor_page(id: Optional[str] = None):
+    # 1. Se l'ID manca o non è un numero (es. ?id=abc), reindirizza subito alla home
+    if not id or not id.isdigit():
+        return RedirectResponse(url="/", status_code=307)
+
+    # 2. Controllo rapido su TMDB per vedere se l'ID persona esiste davvero
+    try:
+        check_url = f"{BASE_URL}/person/{id}?api_key={TMDB_API_KEY}"
+        res = requests.get(check_url)
+
+        # Se TMDB risponde con un errore (es. 404), l'ID non è valido: torna alla home
+        if res.status_code != 200:
+            return RedirectResponse(url="/", status_code=307)
+
+    except Exception:
+        # In caso di errori di rete, per sicurezza torna alla home
+        return RedirectResponse(url="/", status_code=307)
+
+    # 3. Solo se l'ID è valido e l'attore esiste, serviamo il file HTML
+    return FileResponse('actor.html')
 
 
 class MovieDetail(BaseModel):
@@ -89,6 +136,16 @@ def get_movie_details(movie_id: int):
     trailer = next((v["key"] for v in data["videos"]["results"]
                    if v["type"] == "Trailer" and v["site"] == "YouTube"), None)
 
+    # Mappiamo i primi 6 attori includendo l'ID
+    cast_list = []
+    for a in data["credits"]["cast"][:6]:
+        cast_list.append({
+            "id": a["id"],  # <--- Recuperiamo l'ID da TMDB
+            "name": a["name"],
+            "character": a["character"],
+            "profile_path": a["profile_path"]
+        })
+
     return {
         "id": data["id"],
         "title": data["title"],
@@ -101,7 +158,7 @@ def get_movie_details(movie_id: int):
         "vote_average": data.get("vote_average", 0),
         "director": director,
         "trailer_key": trailer,
-        "cast": data["credits"]["cast"][:6]
+        "cast": cast_list
     }
 
 # --- ROTTE FRONTEND (Con protezione URL manipolate) ---
