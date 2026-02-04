@@ -49,7 +49,7 @@
 
                 <div class="mb-8">
                     <h3 class="text-xl font-semibold mb-4 text-[#01b4e4] inline-block">Biografia</h3>
-                    <p id="biography" class="text-gray-200 leading-relaxed text-lg text-justify whitespace-pre-line">
+                    <p id="biography" class="text-gray-200 leading-relaxed text-lg text-left whitespace-pre-line"></p>
                     </p>
                 </div>
             </div>
@@ -102,7 +102,8 @@
             document.getElementById('birthplace').innerText = actor.place_of_birth || "Luogo non disponibile";
 
             // Biografia senza italico e con gestione spazi
-            document.getElementById('biography').innerText = actor.biography || "Non è stata ancora inserita una biografia per questo artista.";
+            // Nel renderActor(actor) di actor.html
+            document.getElementById('biography').innerText = actor.biography || "Biografia non disponibile in italiano o inglese.";
         }
     </script>
 </body>
