@@ -7,7 +7,6 @@
     <title>Dettaglio Film - MovieDB</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Sfumatura per migliorare la leggibilità sopra il backdrop */
         .hero-overlay {
             background-image: linear-gradient(to right, rgba(3, 37, 65, 1) 150px, rgba(3, 37, 65, 0.84) 100%);
         }
@@ -102,85 +101,69 @@
 
         window.onload = async () => {
             const mainContent = document.getElementById('mainContent');
-
-            // Verifica ID (il server fa già il controllo, ma per sicurezza qui gestiamo la fetch)
-            if (!movieId) {
-                window.location.href = '/';
-                return;
-            }
+            if (!movieId) { window.location.href = '/'; return; }
 
             try {
                 const res = await fetch(`${API_BASE}/movie/${movieId}`);
                 if (!res.ok) throw new Error("Film non trovato");
-
                 const movie = await res.json();
-
                 renderDetails(movie);
-
-                // Mostra la pagina
                 mainContent.classList.remove('opacity-0');
             } catch (e) {
-                showToast("Errore durante il caricamento dei dettagli del film.");
+                showToast("Errore durante il caricamento.");
                 setTimeout(() => window.location.href = '/', 3000);
             }
         };
 
         function renderDetails(movie) {
-            // Gestione Poster
             const posterBox = document.getElementById('posterContainer');
             posterBox.innerHTML = movie.poster_path
-                ? `<img src="https://image.tmdb.org/t/p/w500${movie.poster_path}" class="w-full h-auto block shadow-2xl">`
-                : `<span class="text-2xl opacity-50 uppercase">Immagine N/D</span>`;
+                ? `<img src="https://image.tmdb.org/t/p/w500${movie.poster_path}" class="w-full h-auto block">`
+                : `<span class="opacity-50">N/D</span>`;
 
-            // Backdrop di sfondo
             if (movie.backdrop_path) {
                 document.getElementById('heroBg').style.backgroundImage = `url('https://image.tmdb.org/t/p/original${movie.backdrop_path}')`;
             }
 
-            // Titolo e Anno
             const year = movie.release_date ? movie.release_date.split('-')[0] : 'N/D';
             document.getElementById('title').innerText = `${movie.title} (${year})`;
             document.getElementById('releaseDate').innerText = movie.release_date || "N/D";
             document.getElementById('genres').innerText = movie.genres.join(', ');
             document.getElementById('runtime').innerText = movie.runtime ? `${movie.runtime} min` : "N/D";
-            document.getElementById('overview').innerText = movie.overview || "Nessuna descrizione disponibile.";
-            document.getElementById('directorName').innerText = movie.director;
+            document.getElementById('overview').innerText = movie.overview || "Nessuna descrizione.";
 
-            // Rating circolare
+            // Link Person (Regista)
+            const dirElem = document.getElementById('directorName');
+            if (movie.director_id) {
+                dirElem.innerHTML = `<a href="/person?id=${movie.director_id}" class="hover:text-white transition-colors cursor-pointer">${movie.director}</a>`;
+            } else {
+                dirElem.innerText = movie.director;
+            }
+
             const score = Math.round(movie.vote_average * 10);
             const circle = document.getElementById('ratingCircle');
             circle.innerText = `${score}%`;
-            circle.className = `w-16 h-16 bg-[#081c22] border-4 rounded-full flex items-center justify-center text-xl font-bold transition-all transform hover:scale-110 ${score >= 70 ? 'border-green-500' : 'border-yellow-500'}`;
+            circle.className = `w-16 h-16 bg-[#081c22] border-4 rounded-full flex items-center justify-center text-xl font-bold ${score >= 70 ? 'border-green-500' : 'border-yellow-500'}`;
 
-            // Trailer
-            const tBtn = document.getElementById('trailerBtn');
             if (movie.trailer_key) {
+                const tBtn = document.getElementById('trailerBtn');
                 tBtn.href = `https://www.youtube.com/watch?v=${movie.trailer_key}`;
                 tBtn.classList.remove('hidden');
             }
 
-            // Cast (Card cliccabili verso /actor)
             const castGrid = document.getElementById('castGrid');
-            castGrid.innerHTML = "";
-
-            movie.cast.forEach(actor => {
-                const photoHtml = actor.profile_path
-                    ? `<img src="https://image.tmdb.org/t/p/w185${actor.profile_path}" class="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110">`
-                    : `<div class="w-full h-56 bg-gray-700 flex items-center justify-center text-gray-500 font-bold text-xl uppercase tracking-tighter">N/D</div>`;
-
-                castGrid.innerHTML += `
-                    <div class="bg-white text-black rounded-lg overflow-hidden shadow-lg flex flex-col group cursor-pointer transition-all hover:shadow-2xl hover:-translate-y-2" 
-                         onclick="window.location.href='/actor?id=${actor.id}'">
-                        <div class="relative overflow-hidden">
-                            ${photoHtml}
-                            <div class="absolute inset-0 bg-[#01b4e4] mix-blend-multiply opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                        </div>
-                        <div class="p-4 flex-grow flex flex-col justify-center text-left">
-                            <p class="font-bold text-xs leading-tight text-gray-900 group-hover:text-[#01b4e4] transition-colors">${actor.name}</p>
-                            <p class="text-[10px] text-gray-500 uppercase mt-1.5 font-bold tracking-tighter truncate">${actor.character}</p>
-                        </div>
-                    </div>`;
-            });
+            castGrid.innerHTML = movie.cast.map(person => `
+                <div class="bg-white text-black rounded-lg overflow-hidden shadow-lg group cursor-pointer transition-all hover:-translate-y-2" 
+                     onclick="window.location.href='/person?id=${person.id}'">
+                    <div class="relative overflow-hidden">
+                        ${person.profile_path ? `<img src="https://image.tmdb.org/t/p/w185${person.profile_path}" class="w-full h-56 object-cover transition-transform duration-500 group-hover:scale-110">` : `<div class="w-full h-56 bg-gray-700 flex items-center justify-center text-gray-400">N/D</div>`}
+                    </div>
+                    <div class="p-4">
+                        <p class="font-bold text-xs group-hover:text-[#01b4e4] transition-colors">${person.name}</p>
+                        <p class="text-[10px] text-gray-500 uppercase mt-1 font-bold truncate">${person.character}</p>
+                    </div>
+                </div>
+            `).join('');
         }
     </script>
 </body>
